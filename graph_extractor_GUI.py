@@ -127,7 +127,7 @@ class ImageView(QWidget):
 class App(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Curve Digitizer")
+        self.setWindowTitle("Plot Extractor by RF With Care")
 
         self.image_label = ImageView()
         self.image_label.clicked.connect(self.on_click)
@@ -177,6 +177,12 @@ class App(QWidget):
         self.current_curve = None
 
         self.layout_ui()
+        if self.image:
+            self.update_axes_drawn()
+            
+        self.last_path = ""
+        
+        # Disable all buttons
         self.enableButtons(False)
 
     def eventFilter(self, obj, event):
@@ -269,15 +275,58 @@ class App(QWidget):
         arr = np.array([(x, y) for (x, y, *_ ) in pts], float)
 
         default_name = f"{self.current_curve}.csv"
+        
+        start_dir = self.last_path if self.last_path else ""
+        
+        # Ask user where to save
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save CSV", default_name,
+            self,
+            "Save Curve as CSV",
+            os.path.join(start_dir, default_name),
             "CSV Files (*.csv);;All Files (*)"
         )
         if not path:
             return
-
-        np.savetxt(path, arr, delimiter=",", header="x,y", comments="", fmt="%.10g")
-
+    
+        # Get last path
+        self.last_path,_ = os.path.split(path)
+        
+        try:
+            # Save CSV with header and no '#' before header
+            np.savetxt(
+                path,
+                arr,
+                delimiter=",",
+                header="x,y",
+                comments="",
+                fmt="%.10g"
+            )
+    
+            QMessageBox.information(
+                self,
+                "Export Complete",
+                f"Saved {len(arr)} points to:\n{os.path.basename(path)}"
+            )
+    
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Export Failed",
+                f"Could not save file:\n{e}"
+            )
+        
+    def show_message_box(self,strToDisp):
+        """Displays a simple information message box."""
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setText(strToDisp)
+        msg.setWindowTitle("Example Title")
+        msg.setStandardButtons(QMessageBox.Ok)
+        
+        # The exec_() method runs the dialog's local event loop and returns the button clicked
+        returnValue = msg.exec_()
+        return returnValue
+    
     def update_axes_drawn(self):
         try:
             if self.image:
@@ -296,10 +345,20 @@ class App(QWidget):
             pass
 
     def load_image(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Image")
+        # Define starting directory, if available
+        start_dir = self.last_path if self.last_path else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Open Image File",
+            start_dir,
+            "Image Files (*.bmp *.jpg *.jpeg *.png *.gif);;All Files (*)")
+        
         if not path:
             return
-
+        
+        # Store last path
+        self.last_path, _ = os.path.split(path)
+        
         self.image = QPixmap(path)
         self.image_label.set_pixmap(self.image)
 
