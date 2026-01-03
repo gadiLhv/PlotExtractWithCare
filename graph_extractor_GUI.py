@@ -59,6 +59,14 @@ class ImageView(QWidget):
         self.px1 = self.py1 = 10
         self.curvePts = None
         self.curveColor = QColor(50,50,255)
+        
+        # Square dragging interface
+        self.dragging = False
+        self.drag_curve = None
+        self.drag_index = None
+        self.rectSize = 6
+        
+        self.squareList = []
 
     def set_pixmap(self, pixmap):
         self.pix = pixmap
@@ -77,8 +85,57 @@ class ImageView(QWidget):
         self.update()
 
     def mousePressEvent(self, event):
+        gui = self.parent()
+
+        if not self.pix:
+            return
+        # Add Mode: Send coordinates
+        if gui.addPointsMode:            
+            self.clicked.emit(event.pos().x(), event.pos().y())
+            return
+    
+        # Move/Edit mode
+        if event.buttons() & Qt.LeftButton:
+            hit = self.find_point(event.pos())
+            
+            # Go into dragging mode 
+            if hit:
+                self.dragging = True
+                self.drag_curve, self.drag_index = hit
+                return
+        
+        
         if self.pix:
             self.clicked.emit(event.pos().x(), event.pos().y())
+
+    def mouseMoveEvent(self, event):
+
+        gui = self.parent()
+    
+        # Cursor feedback when hovering
+        if not gui.addPointsMode and not self.dragging:
+            if self.find_point(event.pos()):
+                self.setCursor(Qt.CrossCursor)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+    
+        # Dragging
+        if self.dragging:
+            x,y = gui.pixel_to_data(event.pos().x(), event.pos().y())
+            gui.curves[self.drag_curve][self.drag_index] = (x,y)
+            gui.redraw_points()
+            return
+    
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+    
+        if self.dragging:
+            self.dragging = False
+            gui = self.parent()
+            gui.update_curve_table(self.drag_curve)
+    
+        super().mouseReleaseEvent(event)
 
     def sizeHint(self):
         return QSize(600, 400)
@@ -113,8 +170,8 @@ class ImageView(QWidget):
             pen = QPen(cColor, 2)
             painter.setPen(pen)
             painter.setBrush(cColor)
-
-            rectSize = 6
+            
+            rectSize = self.rectSize
             half = rectSize / 2
 
             for i in range(len(self.curvePts)):
@@ -144,6 +201,20 @@ class ImageView(QWidget):
         painter.drawLine(p1, left)
         painter.drawLine(p1, right)
 
+    def find_point(self, pos, radius=self.rectSize):
+        if self.parent() is None:
+            return None
+    
+        # Search for nearest point in currently 
+        # chosen curve
+        gui = self.parent()
+        cname = gui.current_curve;
+        for i,(_,_,px,py) in enumerate(self.curvePts):
+            if (pos.x()-px)**2 + (pos.y()-py)**2 <= radius**2:
+                    return cname, i
+        
+        return None
+    
 class App(QWidget):
     def __init__(self):
         super().__init__()
@@ -341,7 +412,6 @@ class App(QWidget):
         
         self.set_color_button(self.curveColor)
         self.send_curve_to_image()
-    
     
     def export_csv(self):
         if not self.current_curve:
