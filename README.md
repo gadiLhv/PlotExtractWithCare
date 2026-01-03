@@ -23,9 +23,9 @@ Load a graph image, define the coordinate system, add curves, and click points �
 
 ✔ Last-saved folder remembered when exporting
 
-## 🖥️ Screenshot (optional)
+## 🖥️ Screenshot
 
-(Add a screenshot here if you want — users really appreciate it!)
+<img width="600" height="400" alt="image" src="https://github.com/user-attachments/assets/039377e9-ee56-4e06-ae86-ea6b19bf6b7f"/>
 
 ## 🚀 Installation
 ### Requirements
