@@ -1,4 +1,4 @@
-# Curve Digitizer/Plot data extractor
+# Plot data extractor/Curve Digitizer
 # Copyright (C) 2026  Gadi Lahav, RF With Care
 # Contact: gadi@rfwithcare.com
 #
