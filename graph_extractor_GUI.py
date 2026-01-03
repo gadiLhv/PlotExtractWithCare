@@ -481,14 +481,14 @@ class App(QWidget):
         logx = self.xscale.currentText() == "log"
         logy = self.yscale.currentText() == "log"
 
-        x = map_axis(px, px0, px1, x0, x1, logx)
-        y = map_axis(py, py0, py1, y0, y1, logy, True)
-
         rW = self.oImgW/self.cImgW
         rH = self.oImgH/self.cImgH
         ox = px*rW
         oy = py*rH
 
+        x = map_axis(ox, px0, px1, x0, x1, logx)
+        y = map_axis(oy, py0, py1, y0, y1, logy, True)
+        
         pts = self.curves[self.current_curve]
         pts.append((x, y, ox, oy))
         pts.sort(key=lambda p: p[0])
