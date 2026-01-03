@@ -58,6 +58,7 @@ class ImageView(QWidget):
         self.px0 = self.py0 = 0.1
         self.px1 = self.py1 = 10
         self.curvePts = None
+        self.curveColor = QColor(50,50,255)
 
     def set_pixmap(self, pixmap):
         self.pix = pixmap
@@ -67,10 +68,12 @@ class ImageView(QWidget):
         self.px0, self.py0, self.px1, self.py1 = px0, py0, px1, py1
         self.update()
 
-    def set_curve_pixels(self, curvePts, rW, rH):
+    def set_curve_pixels(self, curvePts, rW, rH, color):
         self.curvePts = None if curvePts is None else [
             (x, y, ox*rW, oy*rH) for (x, y, ox, oy) in curvePts
         ]
+        
+        self.curveColor = color
         self.update()
 
     def mousePressEvent(self, event):
@@ -106,7 +109,7 @@ class ImageView(QWidget):
             if not self.curvePts:
                 return
 
-            cColor = QColor(50, 50, 255)
+            cColor = self.curveColor
             pen = QPen(cColor, 2)
             painter.setPen(pen)
             painter.setBrush(cColor)
@@ -167,18 +170,29 @@ class App(QWidget):
         self.yscale = QComboBox()
         self.xscale.addItems(["linear", "log"])
         self.yscale.addItems(["linear", "log"])
-
+        
+        # curve color button
+        self.color_btn = QPushButton()
+        # self.color_btn.setFixedSize(30, 30)
+        self.color_btn.clicked.connect(self.choose_color)
+        self.curveColor = QColor(50, 50, 255) # Initialize as blue
+        self.set_color_button(self.curveColor)
+        
         self.curve_list = QListWidget()
         self.curve_list.currentRowChanged.connect(self.on_curve_changed)
-
+        
+        # Initialize curve dictionary
+        self.curves = {}
+        self.current_curve = None
+        
         self.add_curve_btn = QPushButton("Add Curve")
         self.add_curve_btn.clicked.connect(self.add_curve)
-
+        
         self.point_edit_btn = QPushButton("Add Points Mode")
         self.point_edit_btn.setCheckable(True)
         self.point_edit_btn.clicked.connect(self.switch_edit_add)
         self.addPointsMode = True
-
+        
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["X", "Y"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -190,9 +204,9 @@ class App(QWidget):
         self.export_csv_btn = QPushButton("Export As CSV")
         self.export_csv_btn.clicked.connect(self.export_csv)
 
-        self.curves = {}
-        self.current_curve = None
-
+        self.reset_btn = QPushButton("Reset All")
+        self.reset_btn.clicked.connect(self.reset_all)
+        
         self.layout_ui()
         if self.image:
             self.update_axes_drawn()
@@ -214,7 +228,7 @@ class App(QWidget):
                     rW = self.cImgW/self.oImgW
                     rH = self.cImgH/self.oImgH
                     pts = self.curves[self.current_curve]
-                    self.image_label.set_curve_pixels(pts, rW, rH)
+                    self.image_label.set_curve_pixels(pts, rW, rH, self.curveColor)
 
         return super().eventFilter(obj, event)
 
@@ -257,12 +271,21 @@ class App(QWidget):
 
         right = QVBoxLayout()
         right.addLayout(form)
+        
+        color_layout = QHBoxLayout()
+        color_layout.addWidget(QLabel("Curve Color"))
+        color_layout.addWidget(self.color_btn)
+        right.addLayout(color_layout)
+        
         right.addWidget(QLabel("Curves"))
         right.addWidget(self.add_curve_btn)
         right.addWidget(self.curve_list)
         right.addWidget(self.point_edit_btn)
         right.addWidget(self.table)
-        right.addWidget(self.export_csv_btn)
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.export_csv_btn)
+        btn_row.addWidget(self.reset_btn)
+        right.addLayout(btn_row)
 
         layout = QHBoxLayout()
         layout.addLayout(left, 3)
@@ -276,11 +299,50 @@ class App(QWidget):
             self.xscale, self.yscale,
             self.point_edit_btn, self.add_curve_btn,
             self.export_csv_btn,
+            self.color_btn
         ]:
             w.setEnabled(en)
         
         self.table.setEnabled(not self. addPointsMode)
+    
+    # ---------- COLOR BUTTON ----------
+    def set_color_button(self, color):
+        self.color_btn.setStyleSheet(
+            f"background-color: rgb({color.red()}, {color.green()}, {color.blue()});"
+        )
         
+    def choose_color(self):
+        # if not self.current_curve:
+        #     return
+
+        menu = QMenu()
+
+        colors = [
+            ("Black", QColor(0, 0, 0)),
+            ("White", QColor(255, 255, 255)),
+            ("Gray", QColor(128, 128, 128)),
+            ("Blue", QColor(50, 50, 255)),
+            ("Red", QColor(255, 0, 0)),
+            ("Green", QColor(0, 180, 0)),
+        ]
+
+        for name, col in colors:
+            act = QAction(name, self)
+            act.triggered.connect(lambda _, c=col: self.set_curve_color(c))
+            menu.addAction(act)
+
+        menu.exec_(QCursor.pos())
+    
+    def set_curve_color(self, color):
+        self.curveColor = color
+        
+        if not self.current_curve:
+            return
+        
+        self.set_color_button(self.curveColor)
+        self.send_curve_to_image()
+    
+    
     def export_csv(self):
         if not self.current_curve:
             QMessageBox.information(self, "Export", "No curve is selected")
@@ -440,13 +502,13 @@ class App(QWidget):
         pts = self.curves[self.current_curve]
         rW = self.cImgW/self.oImgW
         rH = self.cImgH/self.oImgH
-        self.image_label.set_curve_pixels(pts, rW, rH)
+        self.image_label.set_curve_pixels(pts, rW, rH, self.curveColor)
 
     def on_curve_changed(self, row):
         if row < 0:
             self.current_curve = None
             self.table.setRowCount(0)
-            self.image_label.set_curve_pixels(None, 1, 1)
+            self.image_label.set_curve_pixels(None, 1, 1, self.curveColor)
             return
 
         self.current_curve = self.curve_list.item(row).text()
@@ -525,6 +587,18 @@ class App(QWidget):
         
         self.update_table()
         self.send_curve_to_image()
+        
+    def reset_all(self):
+        self.image = None
+        self.image_label.set_pixmap(None)
+
+        self.curves.clear()
+        self.curve_list.clear()
+        self.table.setRowCount(0)
+        self.current_curve = None
+
+        self.enableButtons(False)
+        self.img_size_label.setText("Image Size = (N/A,N/A) [px]")
 
 app = QApplication(sys.argv)
 w = App()
