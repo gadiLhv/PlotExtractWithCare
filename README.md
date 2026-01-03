@@ -1,42 +1,49 @@
-Curve Digitizer
+# Plot Extractor / Curve Digitizer
 
 Curve Digitizer is a simple PyQt-based tool that allows you to digitize data points from plotted curves inside images.
 Load a graph image, define the coordinate system, add curves, and click points — the tool converts pixel clicks into real-world X/Y values (linear or logarithmic) and exports them to CSV.
 
-✨ Features
+## ✨ Features
 
 ✔ Load an image file (JPG/PNG/BMP etc.)
+
 ✔ Define the chart coordinate system manually (in pixels)
+
 ✔ Support for linear or logarithmic X/Y axes
+
 ✔ Add multiple curves with names & colors
+
 ✔ Click to create ordered data points per-curve
+
 ✔ Optional point-editing mode
+
 ✔ Normalizes pixel coordinates properly even if the window is resized
+
 ✔ Export curve data to CSV files
+
 ✔ Last-saved folder remembered when exporting
 
-🖥️ Screenshot (optional)
+## 🖥️ Screenshot (optional)
 
 (Add a screenshot here if you want — users really appreciate it!)
 
-🚀 Installation
-Requirements
+## 🚀 Installation
+### Requirements
 
-Python 3.8+
+* Python 3.8+
 
-PyQt5
+* PyQt5
 
-NumPy
+* NumPy
 
-Install dependencies:
+### Install dependencies:
 
-pip install pyqt5 numpy
-
+`pip install pyqt5 numpy`
 
 (Add others like matplotlib if you later use them.)
 
 ▶️ Running the Application
-python curve_digitizer.py
+`python curve_digitizer.py`
 
 📌 How It Works
 
