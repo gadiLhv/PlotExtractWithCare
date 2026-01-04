@@ -67,6 +67,8 @@ class ImageView(QWidget):
         self.rectSize = 6
         
         self.squareList = []
+        
+        self.setMouseTracking(True)
 
     def set_pixmap(self, pixmap):
         self.pix = pixmap
