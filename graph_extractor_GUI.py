@@ -307,7 +307,7 @@ class App(QWidget):
         self.add_curve_btn = QPushButton("Add Curve")
         self.add_curve_btn.clicked.connect(self.add_curve)
         
-        self.point_edit_btn = QPushButton("Add Points Mode")
+        self.point_edit_btn = QPushButton("Current mode: Add Points")
         self.point_edit_btn.setCheckable(True)
         self.point_edit_btn.clicked.connect(self.switch_edit_add)
         self.addPointsMode = True
@@ -354,18 +354,12 @@ class App(QWidget):
 
     def switch_edit_add(self):
         if self.addPointsMode:
-            self.point_edit_btn.setText("Move/Edit Points Mode")
-            self.table.setEnabled(True)
+            self.point_edit_btn.setText("Current mode: Move/Edit Points")
         else:
-            self.point_edit_btn.setText("Add Points Mode")
-            self.table.setEnabled(False)
+            self.point_edit_btn.setText("Current mode: Add Points")
         
-        # Not need to disable buttons one by one like DA ROBOT
-        # suggested. Entire widget is disabled
-        # for r in range(self.table.rowCount()):
-        #     w = self.table.cellWidget(r, 2)
-        #     if w:
-        #         w.setEnabled(not self.addPointsMode)
+        self.table.setEnabled(self.addPointsMode)
+        # self.point_edit_btn.setChecked(self.addPointsMode)
 
         self.addPointsMode = not self.addPointsMode
         self.update_table()
@@ -408,6 +402,7 @@ class App(QWidget):
         right.addWidget(self.add_curve_btn)
         right.addWidget(self.curve_list)
         right.addWidget(self.point_edit_btn)
+        
         right.addWidget(self.table)
         btn_row = QHBoxLayout()
         btn_row.addWidget(self.export_csv_btn)
@@ -432,7 +427,6 @@ class App(QWidget):
         
         self.table.setEnabled(not self. addPointsMode)
     
-    # ---------- COLOR BUTTON ----------
     def set_color_button(self, color):
         self.color_btn.setStyleSheet(
             f"background-color: rgb({color.red()}, {color.green()}, {color.blue()});"
@@ -725,8 +719,7 @@ class App(QWidget):
             pts.pop(row)
     
         self.update_table()
-
-    
+ 
     def get_startstop_pixels(self):
         px0 = float(self.px0.text())
         py0 = float(self.py0.text())
