@@ -77,6 +77,8 @@ class ImageView(QWidget):
         self.update()
 
     def set_curve_pixels(self, curvePts, rW, rH, color):
+        
+        # Convert points to resized coordinate system
         self.curvePts = None if curvePts is None else [
             (x, y, ox*rW, oy*rH) for (x, y, ox, oy) in curvePts
         ]
@@ -99,14 +101,11 @@ class ImageView(QWidget):
             hit = self.find_point(event.pos())
             
             # Go into dragging mode 
-            if hit:
+            if hit[1] >= 0:
                 self.dragging = True
                 self.drag_curve, self.drag_index = hit
                 return
         
-        
-        if self.pix:
-            self.clicked.emit(event.pos().x(), event.pos().y())
 
     def mouseMoveEvent(self, event):
 
@@ -114,26 +113,70 @@ class ImageView(QWidget):
     
         # Cursor feedback when hovering
         if not gui.addPointsMode and not self.dragging:
-            if self.find_point(event.pos()):
+            hit = self.find_point(event.pos())
+            if (hit[1] >= 0):
                 self.setCursor(Qt.CrossCursor)
             else:
                 self.setCursor(Qt.ArrowCursor)
     
         # Dragging
         if self.dragging:
-            x,y = gui.pixel_to_data(event.pos().x(), event.pos().y())
-            gui.curves[self.drag_curve][self.drag_index] = (x,y)
-            gui.redraw_points()
-            return
-    
-        super().mouseMoveEvent(event)
+            # Don't update the table while dragging
+            if self.drag_index:
+                
+                # Current plot size pixels
+                px = event.pos().x()
+                py = event.pos().y()
+                
+                # Curve points
+                self.curvePts[self.drag_index] = (
+                    self.curvePts[self.drag_index][0],
+                    self.curvePts[self.drag_index][1],
+                    px,
+                    py)
+                
+                self.update()
+            else:
+                pass
 
     def mouseReleaseEvent(self, event):
-    
+        
         if self.dragging:
-            self.dragging = False
+            
+            
+            # Recalculate this curve point in local coordinates
+            # and send it to main gui
             gui = self.parent()
-            gui.update_curve_table(self.drag_curve)
+            
+            rW = gui.oImgW/gui.cImgW
+            rH = gui.oImgH/gui.cImgH
+            
+            # Get the reference
+            updatedCurvePts = gui.curves[self.drag_curve]
+            # Iterate through points, and recalculate
+            for i, (x,y,cx,cy) in enumerate(self.curvePts):
+                
+                # Convert to original image pixel CS
+                ox = cx*rW
+                oy = cy*rH
+                
+                # recalculate x and y for graph
+                px0, py0, px1, py1, x0, x1, y0, y1 = gui.get_startstop_pixels()
+
+                logx = gui.xscale.currentText() == "log"
+                logy = gui.yscale.currentText() == "log"
+                
+                x = map_axis(ox, px0, px1, x0, x1, logx)
+                y = map_axis(oy, py0, py1, y0, y1, logy, True)
+                
+                updatedCurvePts[i] = (x,y,ox,oy)
+            
+            gui.curves[self.drag_curve] = updatedCurvePts
+            gui.update_table()
+            
+            self.dragging = False
+            self.drag_index = None
+            self.drag_curve = None
     
         super().mouseReleaseEvent(event)
 
@@ -201,9 +244,12 @@ class ImageView(QWidget):
         painter.drawLine(p1, left)
         painter.drawLine(p1, right)
 
-    def find_point(self, pos, radius=self.rectSize):
+    def find_point(self, pos, radius=None):
         if self.parent() is None:
             return None
+    
+        if not radius:
+            radius = self.rectSize
     
         # Search for nearest point in currently 
         # chosen curve
@@ -211,9 +257,9 @@ class ImageView(QWidget):
         cname = gui.current_curve;
         for i,(_,_,px,py) in enumerate(self.curvePts):
             if (pos.x()-px)**2 + (pos.y()-py)**2 <= radius**2:
-                    return cname, i
+                return cname, i
         
-        return None
+        return None,-1
     
 class App(QWidget):
     def __init__(self):
@@ -538,15 +584,7 @@ class App(QWidget):
         if not self.current_curve or not self.addPointsMode:
             return
 
-        px0 = float(self.px0.text())
-        py0 = float(self.py0.text())
-        px1 = float(self.px1.text())
-        py1 = float(self.py1.text())
-
-        x0 = float(self.x0.text())
-        x1 = float(self.x1.text())
-        y0 = float(self.y0.text())
-        y1 = float(self.y1.text())
+        px0, py0, px1, py1, x0, x1, y0, y1 = self.get_startstop_pixels()
 
         logx = self.xscale.currentText() == "log"
         logy = self.yscale.currentText() == "log"
@@ -583,7 +621,6 @@ class App(QWidget):
 
         self.current_curve = self.curve_list.item(row).text()
         self.update_table()
-        self.send_curve_to_image()
 
     def update_table(self):
         if not self.current_curve:
@@ -591,6 +628,9 @@ class App(QWidget):
             return
 
         pts = self.curves[self.current_curve]
+        pts.sort(key=lambda p: p[0])
+        self.curves[self.current_curve] = pts
+        
         self._updating_table = True
         self.table.setRowCount(len(pts))
 
@@ -607,6 +647,7 @@ class App(QWidget):
             self.table.setItem(i, 1, QTableWidgetItem(f"{y:g}"))
 
         self._updating_table = False
+        self.send_curve_to_image()
 
     def on_table_item_changed(self, item):
         if self._updating_table or self.addPointsMode or not self.current_curve:
@@ -638,6 +679,19 @@ class App(QWidget):
         logx = self.xscale.currentText() == "log"
         logy = self.yscale.currentText() == "log"
 
+        px0, py0, px1, py1, x0, y0, x1, y1 = self.get_startstop_pixels()
+        
+        ox = inv_map_axis(x, px0, px1, x0, x1, logx)
+        oy = inv_map_axis(y, py0, py1, y0, y1, logy, True)
+
+        pts[row] = (x, y, ox, oy)
+        pts.sort(key=lambda p: p[0])
+        self.curves[self.current_curve] = pts
+        
+        self.update_table()
+        self.send_curve_to_image()
+    
+    def get_startstop_pixels(self):
         px0 = float(self.px0.text())
         py0 = float(self.py0.text())
         px1 = float(self.px1.text())
@@ -648,16 +702,8 @@ class App(QWidget):
         y0 = float(self.y0.text())
         y1 = float(self.y1.text())
 
-        ox = inv_map_axis(x, px0, px1, x0, x1, logx)
-        oy = inv_map_axis(y, py0, py1, y0, y1, logy, True)
-
-        pts[row] = (x, y, ox, oy)
-        pts.sort(key=lambda p: p[0])
-        self.curves[self.current_curve] = pts
-        
-        self.update_table()
-        self.send_curve_to_image()
-        
+        return px0, py0, px1, py1, x0, x1, y0, y1        
+    
     def reset_all(self):
         self.image = None
         self.image_label.set_pixmap(None)
