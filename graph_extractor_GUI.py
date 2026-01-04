@@ -62,7 +62,7 @@ class ImageView(QWidget):
         
         # Square dragging interface
         self.dragging = False
-        self.drag_curve = None
+        self.drag_curve = -1
         self.drag_index = None
         self.rectSize = 6
         
@@ -112,7 +112,7 @@ class ImageView(QWidget):
         gui = self.parent()
     
         # Cursor feedback when hovering
-        if not gui.addPointsMode and not self.dragging:
+        if not gui.addPointsMode:
             hit = self.find_point(event.pos())
             if (hit[1] >= 0):
                 self.setCursor(Qt.CrossCursor)
@@ -122,7 +122,7 @@ class ImageView(QWidget):
         # Dragging
         if self.dragging:
             # Don't update the table while dragging
-            if self.drag_index:
+            if self.drag_index >= 0:
                 
                 # Current plot size pixels
                 px = event.pos().x()
@@ -175,7 +175,7 @@ class ImageView(QWidget):
             gui.update_table()
             
             self.dragging = False
-            self.drag_index = None
+            self.drag_index = -1
             self.drag_curve = None
     
         super().mouseReleaseEvent(event)
