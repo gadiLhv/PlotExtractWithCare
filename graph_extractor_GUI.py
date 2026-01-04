@@ -312,9 +312,10 @@ class App(QWidget):
         self.point_edit_btn.clicked.connect(self.switch_edit_add)
         self.addPointsMode = True
         
-        self.table = QTableWidget(0, 2)
+        self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["X", "Y"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setColumnWidth(2, 40)   # small delete button column
 
         # guard flag to prevent recursion
         self._updating_table = False
@@ -358,6 +359,13 @@ class App(QWidget):
         else:
             self.point_edit_btn.setText("Add Points Mode")
             self.table.setEnabled(False)
+        
+        # Not need to disable buttons one by one like DA ROBOT
+        # suggested. Entire widget is disabled
+        # for r in range(self.table.rowCount()):
+        #     w = self.table.cellWidget(r, 2)
+        #     if w:
+        #         w.setEnabled(not self.addPointsMode)
 
         self.addPointsMode = not self.addPointsMode
         self.update_table()
@@ -647,6 +655,7 @@ class App(QWidget):
         for i, (x, y, _, _) in enumerate(pts):
             self.table.setItem(i, 0, QTableWidgetItem(f"{x:g}"))
             self.table.setItem(i, 1, QTableWidgetItem(f"{y:g}"))
+            self.add_delete_button(i)
 
         self._updating_table = False
         self.send_curve_to_image()
@@ -692,6 +701,31 @@ class App(QWidget):
         
         self.update_table()
         self.send_curve_to_image()
+    
+    def add_delete_button(self, row):
+        btn = QPushButton("X")
+        btn.setFixedWidth(30)
+    
+        # disable when NOT in edit mode
+        btn.setEnabled(not self.addPointsMode)
+    
+        btn.clicked.connect(lambda _, r=row: self.delete_point(r))
+        self.table.setCellWidget(row, 2, btn)
+
+    def delete_point(self, row):
+        if self.addPointsMode:
+            return  # deletion only in edit mode
+    
+        if not self.current_curve:
+            return
+    
+        pts = self.curves[self.current_curve]
+    
+        if 0 <= row < len(pts):
+            pts.pop(row)
+    
+        self.update_table()
+
     
     def get_startstop_pixels(self):
         px0 = float(self.px0.text())
