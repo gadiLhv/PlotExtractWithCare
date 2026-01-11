@@ -23,18 +23,16 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
-def map_axis(v, p0, p1, d0, d1, logscale=False, invertAxis=False):
+def map_axis(v, p0, p1, d0, d1, logscale=False):
     if logscale:
         d0 = math.log10(d0)
         d1 = math.log10(d1)
-    if invertAxis:
-        t = (p1 - v) / (p1 - p0)
-    else:
-        t = (v - p0) / (p1 - p0)
+    
+    t = (v - p0) / (p1 - p0)
     dv = d0 + t * (d1 - d0)
     return 10**dv if logscale else dv
 
-def inv_map_axis(dv, p0, p1, d0, d1, logscale=False, invertAxis=False):
+def inv_map_axis(dv, p0, p1, d0, d1, logscale=False):
     if logscale:
         d0 = math.log10(d0)
         d1 = math.log10(d1)
@@ -42,10 +40,8 @@ def inv_map_axis(dv, p0, p1, d0, d1, logscale=False, invertAxis=False):
     # Convert to logarithmic if necessary
     v = math.log10(dv) if logscale else dv
     t = (v - d0)/(d1 - d0)
-    if invertAxis:
-        v = p1 - t*(p1 - p0)
-    else:
-        v = p0 + t*(p1 - p0)
+    
+    v = p0 + t*(p1 - p0)
         
     return v
     
@@ -108,7 +104,6 @@ class ImageView(QWidget):
                 self.drag_curve, self.drag_index = hit
                 return
         
-
     def mouseMoveEvent(self, event):
 
         gui = self.parent()
@@ -155,6 +150,11 @@ class ImageView(QWidget):
             
             # Get the reference
             updatedCurvePts = gui.curves[self.drag_curve]
+            
+            # recalculate x and y for graph
+            px0, py0, px1, py1, x0, x1, y0, y1 = gui.get_startstop_pixels()
+            oImgH = gui.oImgH
+            
             # Iterate through points, and recalculate
             for i, (x,y,cx,cy) in enumerate(self.curvePts):
                 
@@ -162,14 +162,13 @@ class ImageView(QWidget):
                 ox = cx*rW
                 oy = cy*rH
                 
-                # recalculate x and y for graph
-                px0, py0, px1, py1, x0, x1, y0, y1 = gui.get_startstop_pixels()
+                
 
                 logx = gui.xscale.currentText() == "log"
                 logy = gui.yscale.currentText() == "log"
                 
-                x = map_axis(ox, px0, px1, x0, x1, logx)
-                y = map_axis(oy, py0, py1, y0, y1, logy, True)
+                x = map_axis(ox        , px0, px1, x0, x1, logx)
+                y = map_axis(oImgH - oy, py0, py1, y0, y1, logy)
                 
                 updatedCurvePts[i] = (x,y,ox,oy)
             
@@ -598,8 +597,9 @@ class App(QWidget):
         ox = px*rW
         oy = py*rH
 
-        x = map_axis(ox, px0, px1, x0, x1, logx)
-        y = map_axis(oy, py0, py1, y0, y1, logy, True)
+        # Invert y axis only while mapping
+        x = map_axis(ox             , px0, px1, x0, x1, logx)
+        y = map_axis(self.oImgH - oy, py0, py1, y0, y1, logy)
         
         pts = self.curves[self.current_curve]
         pts.append((x, y, ox, oy))
@@ -673,7 +673,7 @@ class App(QWidget):
             return
 
         # Update 1st or 2nd column
-        x, y, debug_x, debug_y = pts[row]
+        x, y, _, _ = pts[row]
         if col == 0:
             x = new_val
         else:
@@ -687,8 +687,11 @@ class App(QWidget):
         px0, py0, px1, py1, x0, y0, x1, y1 = self.get_startstop_pixels()
         
         ox = inv_map_axis(x, px0, px1, x0, x1, logx)
-        oy = inv_map_axis(y, py0, py1, y0, y1, logy, True)
-
+        oy = inv_map_axis(y, py0, py1, y0, y1, logy)
+        
+        # Flip oy, as inversion should be done while mapping only
+        oy = self.oImgH - oy
+        
         pts[row] = (x, y, ox, oy)
         pts.sort(key=lambda p: p[0])
         self.curves[self.current_curve] = pts
