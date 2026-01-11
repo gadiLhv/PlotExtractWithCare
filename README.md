@@ -42,8 +42,17 @@ Load a graph image, define the coordinate system, add curves, and click points �
 
 (Add others like matplotlib if you later use them.)
 
-▶️ Running the Application
-`python curve_digitizer.py`
+### 🧰 Installing
+
+`pip install -e <Repository Dir>`
+
+Example:
+
+`pip install -e C:\Repos\PlotExtractWithCare\`
+
+### ▶️ Running the Application
+
+`python -m plotextractwithcare`
 
 ## 📌 How It Works
 
