@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plotextractwithcare"
+version = "0.1.0"
+description = "Short description of your GUI tool"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "GPLv3"}
+authors = [
+  {name = "Gadi Lahav", email = "gadi@rfwithcare.com"}
+]
+
+dependencies = [
+  "numpy",
+  "PyQt5",        # or PySide5 / tkinter etc.
+]
+
+[project.scripts]
+yourtool = "plotextractwithcare.__main__:main"

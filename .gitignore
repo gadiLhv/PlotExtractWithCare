@@ -10,3 +10,6 @@
 /*.exe
 /dist
 /dist/*
+/src/*.egg*
+/src/plotextractwithcare/__pycache__
+/src/plotextractwithcare/__pycache__/*

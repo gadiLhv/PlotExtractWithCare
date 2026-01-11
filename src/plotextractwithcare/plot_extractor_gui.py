@@ -748,7 +748,15 @@ class App(QWidget):
         self.enableButtons(False)
         self.img_size_label.setText("Image Size = (N/A,N/A) [px]")
 
-app = QApplication(sys.argv)
-w = App()
-w.show()
-sys.exit(app.exec_())
+def main():
+    app = QApplication(sys.argv)
+    w = App()
+    w.show()
+    # existing code to launch your window goes here
+    # e.g. window = MyMainWindow()
+    #       window.show()
+    sys.exit(app.exec_())
+
+# Optional: allow running this file directly
+if __name__ == "__main__":
+    main()
