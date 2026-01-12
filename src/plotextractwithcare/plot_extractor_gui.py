@@ -684,7 +684,7 @@ class App(QWidget):
         logx = self.xscale.currentText() == "log"
         logy = self.yscale.currentText() == "log"
 
-        px0, py0, px1, py1, x0, y0, x1, y1 = self.get_startstop_pixels()
+        px0, py0, px1, py1, x0, x1, y0, y1 = self.get_startstop_pixels()
         
         ox = inv_map_axis(x, px0, px1, x0, x1, logx)
         oy = inv_map_axis(y, py0, py1, y0, y1, logy)
