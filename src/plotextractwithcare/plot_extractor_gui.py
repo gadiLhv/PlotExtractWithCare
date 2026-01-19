@@ -56,6 +56,11 @@ class ImageView(QWidget):
         self.curvePts = None
         self.curveColor = QColor(50,50,255)
         
+        # Axis and dragging
+        self.arrowWidth = 4
+        self.axisDrag = False
+        self.axisPointDrag = -1
+        
         # Square dragging interface
         self.dragging = False
         self.drag_curve = -1
@@ -89,11 +94,23 @@ class ImageView(QWidget):
 
         if not self.pix:
             return
+        
+        # Drag axis mode takes priority
+        if event.buttons() & Qt.LeftButton:
+            hit = self.find_axisEnd(event.pos())
+            
+            if hit >= 0:
+                self.axisDrag = True
+                self.axisPointDrag = hit
+                
+            # If this you are in axis drag mode, don't drag the points
+            return
+        
         # Add Mode: Send coordinates
         if gui.addPointsMode:            
             self.clicked.emit(event.pos().x(), event.pos().y())
             return
-    
+                    
         # Move/Edit mode
         if event.buttons() & Qt.LeftButton:
             hit = self.find_point(event.pos())
@@ -108,7 +125,31 @@ class ImageView(QWidget):
 
         gui = self.parent()
     
-        # Cursor feedback when hovering
+        # Drag axis mode takes priority
+        if not gui.axisDragModeText:
+            hit = self.find_axisEnd(event.pos())
+            if (hit >= 0):
+                self.setCursor(Qt.CrossCursor)
+            else:
+                self.setCursor(Qt.ArrowCursor)
+        
+        # Dragging one of the axes
+        if self.axisDrag:
+            # If dragging the root, need to move all the points
+            if self.axisPointDrag == 0:
+                self.px0 = event.pos().x()
+                self.py0 = event.pos().y()
+            if self.axisPointDrag == 1:
+                self.px1 = event.pos().x()
+            if self.axisPointDrag == 2:
+                self.py1 = event.pos().y()
+        
+            self.update()
+            
+            # Don't allow 
+            return
+        
+        # Cursor feedback when hovering, on add point mode
         if not gui.addPointsMode:
             hit = self.find_point(event.pos())
             if (hit[1] >= 0):
@@ -116,6 +157,8 @@ class ImageView(QWidget):
             else:
                 self.setCursor(Qt.ArrowCursor)
     
+
+            
         # Dragging
         if self.dragging:
             # Don't update the table while dragging
@@ -138,6 +181,14 @@ class ImageView(QWidget):
 
     def mouseReleaseEvent(self, event):
         
+        if self.axisDrag:
+            self.axisDrag = False
+            self.axisPointDrag = -1
+            
+            # Now all the points, tables, etc. need to be updated
+            
+            return
+            
         if self.dragging:
             
             
@@ -162,8 +213,6 @@ class ImageView(QWidget):
                 ox = cx*rW
                 oy = cy*rH
                 
-                
-
                 logx = gui.xscale.currentText() == "log"
                 logy = gui.yscale.currentText() == "log"
                 
@@ -228,7 +277,7 @@ class ImageView(QWidget):
                     )
 
     def draw_arrow(self, painter, p0, p1, color):
-        pen = QPen(color, 4)
+        pen = QPen(color, self.arrowWidth)
         painter.setPen(pen)
         painter.drawLine(p0, p1)
 
@@ -262,6 +311,29 @@ class ImageView(QWidget):
         
         return None,-1
     
+    def find_axisEnd(self, pos, radius=None):
+        if self.parent() is None:
+            return None
+        
+        if not radius:
+            radius = self.arrowWidth
+                
+        # Search for axis ends
+        dx_0 = abs(pos.x() - self.px0) 
+        dx_1 = abs(pos.x() - self.px1)
+        dy_0 = abs(pos.y() - self.py0) 
+        dy_1 = abs(pos.y() - self.py1)
+        
+        # Axis root
+        if (dx_0 <= self.arrowWidth) and (dy_0 <= self.arrowWidth):
+            return 0
+        if (dx_1 <= self.arrowWidth) and (dy_0 <= self.arrowWidth):
+            return 1
+        if (dx_0 <= self.arrowWidth) and (dy_1 <= self.arrowWidth):
+            return 2   
+        
+        return -1
+        
 class App(QWidget):
     def __init__(self):
         super().__init__()
@@ -278,6 +350,12 @@ class App(QWidget):
         self.px1 = QLineEdit("N/A")
         self.py1 = QLineEdit("N/A")
 
+        # Button to allow dragging axes "graphically"
+        self.axisDragModeBtn = QPushButton()
+        self.axisDragModeBtn.setCheckable(True)
+        self.axisDragModeBtn.clicked.connect(self.switch_axis_entry_mode)
+        self.axisDragModeText = True
+        
         # data CS
         self.x0 = QLineEdit("0.1")
         self.x1 = QLineEdit("10")
@@ -363,6 +441,18 @@ class App(QWidget):
         self.addPointsMode = not self.addPointsMode
         self.update_table()
 
+    def switch_axis_entry_mode(self):
+        if self.axisDragModeText:
+            self.axisDragModeBtn.setText("Axis Setup Mode:\n\nGraphical")
+        else:
+            self.axisDragModeBtn.setText("Axis Setup Mode:\n\nText")
+        
+        for w in [self.px0, self.px1, self.py0, self.py1]:
+            w.setDisabled(self.axisDragModeText)
+        
+        # Toggle this indicator
+        self.axisDragModeText = not self.axisDragModeText
+
     def layout_ui(self):
         load_btn = QPushButton("Load Image")
         load_btn.clicked.connect(self.load_image)
@@ -371,10 +461,35 @@ class App(QWidget):
         self.img_size_label = QLabel("Image Size = (N/A,N/A) [px]")
         form.addRow(self.img_size_label)
 
-        form.addRow("CS Start X [px]", self.px0)
-        form.addRow("CS Start Y [px]", self.py0)
-        form.addRow("CS End X [px]", self.px1)
-        form.addRow("CS End Y [px]", self.py1)
+        # Allow the axis set to be either text based or draggable
+        axisSetForm = QFormLayout()
+        axisSetForm.addRow("CS Start X [px]", self.px0)
+        axisSetForm.addRow("CS Start Y [px]", self.py0)
+        axisSetForm.addRow("CS End X [px]", self.px1)
+        axisSetForm.addRow("CS End Y [px]", self.py1)
+
+        # Setup button size
+        self.axisDragModeBtn.setMinimumSize(120, 100)   # make it large
+        self.axisDragModeBtn.setSizePolicy(
+                QSizePolicy.Expanding,
+                QSizePolicy.Expanding
+            )
+
+        axisSetLayout = QHBoxLayout()
+        axisSetLayout.addLayout(axisSetForm, stretch=1)
+        axisSetLayout.addWidget(self.axisDragModeBtn, stretch=0)
+        self.axisDragModeBtn.setText("Axis Setup Mode:\n\nText")
+
+        axisSetWidget = QWidget()
+        axisSetWidget.setLayout(axisSetLayout)
+
+        form.addRow(axisSetWidget)
+        
+        # form.addRow("CS Start X [px]", self.px0)
+        # form.addRow("CS Start Y [px]", self.py0)
+        # form.addRow("CS End X [px]", self.px1)
+        # form.addRow("CS End Y [px]", self.py1)
+        
         form.addRow("Data X min", self.x0)
         form.addRow("Data X max", self.x1)
         form.addRow("Data Y min", self.y0)
@@ -415,14 +530,19 @@ class App(QWidget):
 
     def enableButtons(self, en=True):
         for w in [
-            self.px0, self.px1, self.py0, self.py1,
             self.x0, self.x1, self.y0, self.y1,
             self.xscale, self.yscale,
             self.point_edit_btn, self.add_curve_btn,
             self.export_csv_btn,
-            self.color_btn
+            self.color_btn,
+            self.axisDragModeBtn
         ]:
             w.setEnabled(en)
+        
+        # These are enabled only if the GUI is in graphic 
+        # axis drag mode
+        for w in [self.px0, self.px1, self.py0, self.py1]:
+            w.setEnabled(self.axisDragModeText & en)
         
         self.table.setEnabled(not self. addPointsMode)
     
@@ -653,6 +773,8 @@ class App(QWidget):
 
         self._updating_table = False
         self.send_curve_to_image()
+
+    
 
     def on_table_item_changed(self, item):
         if self._updating_table or self.addPointsMode or not self.current_curve:
