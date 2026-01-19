@@ -96,7 +96,7 @@ class ImageView(QWidget):
             return
         
         # Drag axis mode takes priority
-        if event.buttons() & Qt.LeftButton:
+        if event.buttons() & Qt.LeftButton & (not gui.axisDragModeText):
             hit = self.find_axisEnd(event.pos())
             
             if hit >= 0:
@@ -156,11 +156,11 @@ class ImageView(QWidget):
                 self.setCursor(Qt.CrossCursor)
             else:
                 self.setCursor(Qt.ArrowCursor)
-    
-
-            
+        
         # Dragging
         if self.dragging:
+            gui = self.parent()
+            
             # Don't update the table while dragging
             if self.drag_index >= 0:
                 
@@ -184,13 +184,37 @@ class ImageView(QWidget):
         if self.axisDrag:
             self.axisDrag = False
             self.axisPointDrag = -1
-            
+        
             # Now all the points, tables, etc. need to be updated
+            gui = self.parent()
             
+            oImgH = gui.oImgH
+            rW = gui.oImgW/gui.cImgW
+            rH = gui.oImgH/gui.cImgH
+            
+            ox0 = round(self.px0*rW*10)/10
+            ox1 = round(self.px1*rW*10)/10
+            oy0 = round((oImgH - self.py0*rH)*10)/10
+            oy1 = round((oImgH - self.py1*rH)*10)/10
+            
+            # Re-calculate with this roundup
+            self.px0 = ox0/rW
+            self.px1 = ox1/rW
+              
+            self.py0 = (oImgH - oy0)/rH
+            self.py1 = (oImgH - oy1)/rH
+            
+            gui.px0.setText(f"{ox0:g}")
+            gui.px1.setText(f"{ox1:g}")
+            gui.py0.setText(f"{oy0:g}")
+            gui.py1.setText(f"{oy1:g}")
+            
+            gui.update_table()
+            
+            self.update()
             return
             
         if self.dragging:
-            
             
             # Recalculate this curve point in local coordinates
             # and send it to main gui
@@ -662,6 +686,19 @@ class App(QWidget):
         except Exception:
             pass
 
+    def renormalize_all_curves(self):
+        # this function is called when the axes have changed.
+        
+        # Get required data to start reonarmalizing everything
+        logx = self.xscale.currentText() == "log"
+        logy = self.yscale.currentText() == "log"
+
+        px0, py0, px1, py1, x0, x1, y0, y1 = self.get_startstop_pixels()
+        
+        for curveIdx,cCurve in enumerate(self.curves):
+            for pIdx,cPt in enumerate(cCurve):
+                 pass
+
     def load_image(self):
         # Define starting directory, if available
         start_dir = self.last_path if self.last_path else ""
@@ -773,8 +810,6 @@ class App(QWidget):
 
         self._updating_table = False
         self.send_curve_to_image()
-
-    
 
     def on_table_item_changed(self, item):
         if self._updating_table or self.addPointsMode or not self.current_curve:
