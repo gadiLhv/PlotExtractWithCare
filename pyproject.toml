@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plotextractwithcare"
-version = "0.1.1"
-description = "Short description of your GUI tool"
+version = "0.1.2"
+description = "Data extraction tool from image graphs"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "GPLv3"}
