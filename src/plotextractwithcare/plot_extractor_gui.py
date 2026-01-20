@@ -125,10 +125,13 @@ class ImageView(QWidget):
 
         gui = self.parent()
     
-        # Drag axis mode takes priority
-        if not gui.axisDragModeText:
-            hit = self.find_axisEnd(event.pos())
-            if (hit >= 0):
+        # Cursor feedback when hovering, on add point mode
+        if (not gui.axisDragModeText) or (not gui.addPointsMode):
+            hitAx = self.find_axisEnd(event.pos())
+            hitPt = self.find_point(event.pos())
+            if (hitAx >= 0) and (not gui.axisDragModeText):
+                self.setCursor(Qt.CrossCursor)
+            elif (hitPt[1] >= 0) and (gui.axisDragModeText) and (not gui.addPointsMode):
                 self.setCursor(Qt.CrossCursor)
             else:
                 self.setCursor(Qt.ArrowCursor)
@@ -143,19 +146,10 @@ class ImageView(QWidget):
                 self.px1 = event.pos().x()
             if self.axisPointDrag == 2:
                 self.py1 = event.pos().y()
-        
-            self.update()
             
-            # Don't allow 
-            return
+            self.update()
         
-        # Cursor feedback when hovering, on add point mode
-        if not gui.addPointsMode:
-            hit = self.find_point(event.pos())
-            if (hit[1] >= 0):
-                self.setCursor(Qt.CrossCursor)
-            else:
-                self.setCursor(Qt.ArrowCursor)
+            return 
         
         # Dragging
         if self.dragging:
@@ -209,7 +203,7 @@ class ImageView(QWidget):
             gui.py0.setText(f"{oy0:g}")
             gui.py1.setText(f"{oy1:g}")
             
-            gui.update_table()
+            gui.renormalize_all_curves()
             
             self.update()
             return
@@ -385,6 +379,13 @@ class App(QWidget):
         self.x1 = QLineEdit("10")
         self.y0 = QLineEdit("0.1")
         self.y1 = QLineEdit("10")
+        
+        # Connect all of them to allow axis scaling 
+        for cLineEdit in [self.px0, self.px1, 
+                          self.py0, self.py1, 
+                          self.x0, self.x1, 
+                          self.y0, self.y1]:
+            cLineEdit.editingFinished.connect(self.on_scale_changed)
 
         self.xscale = QComboBox()
         self.yscale = QComboBox()
@@ -459,17 +460,26 @@ class App(QWidget):
         else:
             self.point_edit_btn.setText("Current mode: Add Points")
         
-        self.table.setEnabled(self.addPointsMode)
-        # self.point_edit_btn.setChecked(self.addPointsMode)
-
+        # self.table.setEnabled(self.addPointsMode)
+        
+        # Try to enable scrolling
+        if self.addPointsMode:
+            self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.table.setSelectionMode(QAbstractItemView.NoSelection)
+            self.table.setFocusPolicy(Qt.NoFocus)
+        else:
+            self.table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+            self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+            self.table.setFocusPolicy(Qt.StrongFocus)
+        
         self.addPointsMode = not self.addPointsMode
         self.update_table()
 
     def switch_axis_entry_mode(self):
         if self.axisDragModeText:
-            self.axisDragModeBtn.setText("Axis Setup Mode:\n\nGraphical")
+            self.axisDragModeBtn.setText("Axis Setup Mode:\n\nGraphical\n\nPoints Cannot Be Added/Modified")
         else:
-            self.axisDragModeBtn.setText("Axis Setup Mode:\n\nText")
+            self.axisDragModeBtn.setText("Axis Setup Mode:\n\nText\n\n")
         
         for w in [self.px0, self.px1, self.py0, self.py1]:
             w.setDisabled(self.axisDragModeText)
@@ -493,7 +503,7 @@ class App(QWidget):
         axisSetForm.addRow("CS End Y [px]", self.py1)
 
         # Setup button size
-        self.axisDragModeBtn.setMinimumSize(120, 100)   # make it large
+        self.axisDragModeBtn.setMinimumSize(180, 100)   # make it large
         self.axisDragModeBtn.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Expanding
@@ -502,7 +512,7 @@ class App(QWidget):
         axisSetLayout = QHBoxLayout()
         axisSetLayout.addLayout(axisSetForm, stretch=1)
         axisSetLayout.addWidget(self.axisDragModeBtn, stretch=0)
-        self.axisDragModeBtn.setText("Axis Setup Mode:\n\nText")
+        self.axisDragModeBtn.setText("Axis Setup Mode:\n\nText\n\n")
 
         axisSetWidget = QWidget()
         axisSetWidget.setLayout(axisSetLayout)
@@ -568,7 +578,17 @@ class App(QWidget):
         for w in [self.px0, self.px1, self.py0, self.py1]:
             w.setEnabled(self.axisDragModeText & en)
         
-        self.table.setEnabled(not self. addPointsMode)
+        # self.table.setEnabled(not self. addPointsMode)
+        
+                # Try to enable scrolling
+        if self.addPointsMode:
+            self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            self.table.setSelectionMode(QAbstractItemView.NoSelection)
+            self.table.setFocusPolicy(Qt.NoFocus)
+        else:
+            self.table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+            self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+            self.table.setFocusPolicy(Qt.StrongFocus)
     
     def set_color_button(self, color):
         self.color_btn.setStyleSheet(
@@ -695,9 +715,25 @@ class App(QWidget):
 
         px0, py0, px1, py1, x0, x1, y0, y1 = self.get_startstop_pixels()
         
-        for curveIdx,cCurve in enumerate(self.curves):
-            for pIdx,cPt in enumerate(cCurve):
-                 pass
+        # for every curve, recompute (x,y) from (ox,oy)
+        for name, pts in self.curves.items():
+            new_pts = []
+            for (_, _, ox, oy) in pts:
+                # use map_axis to compute new data coords
+                # note: oy is (original image) pixel y so we must “invert” to data y:
+                # map_axis expects v=oy from bottom → top pixel, so use oImgH-oy
+                data_x = map_axis(ox, px0, px1, x0, x1, logx)
+                data_y = map_axis(self.oImgH - oy, py0, py1, y0, y1, logy)
+    
+                new_pts.append((data_x, data_y, ox, oy))
+    
+            # sort by x in case ordering changed
+            new_pts.sort(key=lambda p: p[0])
+            self.curves[name] = new_pts
+
+        # if a curve is selected, refresh UI
+        self.update_table()
+        self.send_curve_to_image()
 
     def load_image(self):
         # Define starting directory, if available
@@ -782,6 +818,9 @@ class App(QWidget):
 
         self.current_curve = self.curve_list.item(row).text()
         self.update_table()
+
+    def on_scale_changed(self):
+        self.renormalize_all_curves()
 
     def update_table(self):
         if not self.current_curve:
