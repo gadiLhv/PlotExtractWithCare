@@ -312,7 +312,7 @@ class App(QWidget):
         self.addPointsMode = True
         
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["X", "Y"])
+        self.table.setHorizontalHeaderLabels(["X", "Y", "Delete"])
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setColumnWidth(2, 40)   # small delete button column
 
