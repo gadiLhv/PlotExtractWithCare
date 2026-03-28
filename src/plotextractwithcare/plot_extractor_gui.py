@@ -314,7 +314,7 @@ class ImageView(QWidget):
 
     def find_point(self, pos, radius=None):
         if self.parent() is None:
-            return None
+            return None,-1
     
         if not radius:
             radius = self.rectSize
@@ -323,6 +323,8 @@ class ImageView(QWidget):
         # chosen curve
         gui = self.parent()
         cname = gui.current_curve;
+        if cname is None:
+            return None,-1
         for i,(_,_,px,py) in enumerate(self.curvePts):
             if (pos.x()-px)**2 + (pos.y()-py)**2 <= radius**2:
                 return cname, i
