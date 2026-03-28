@@ -42,13 +42,17 @@ Load a graph image, define the coordinate system, add curves, and click points �
 
 (Add others like matplotlib if you later use them.)
 
-### 🧰 Installing
+### 🧰 Local Installation
 
 `pip install -e <Repository Dir>`
 
 Example:
 
 `pip install -e C:\Repos\PlotExtractWithCare\`
+
+Install From pypi:
+
+`pip install plotextractwithcare`
 
 ### ▶️ Running the Application
 
