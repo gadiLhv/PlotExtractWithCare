@@ -325,6 +325,7 @@ class ImageView(QWidget):
         cname = gui.current_curve;
         if cname is None:
             return None,-1
+        
         for i,(_,_,px,py) in enumerate(self.curvePts):
             if (pos.x()-px)**2 + (pos.y()-py)**2 <= radius**2:
                 return cname, i
